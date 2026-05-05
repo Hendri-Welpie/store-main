@@ -1,0 +1,1255 @@
+{
+  "info": {
+    "name": "Store API",
+    "description": "Complete test suite for the Store API.\n\nRun the folders **in order** (1 → 2 → 3) so that the IDs created in the Customer and Product setup steps are available as collection variables when the Order tests run.\n\nCollection variables set automatically by tests:\n- `customerId`  — set by \"Create Customer\"\n- `product1Id`  — set by \"Create Product 1\"\n- `product2Id`  — set by \"Create Product 2\"\n- `orderId`     — set by \"Create Order\"\n\nChange `baseUrl` in *Variables* if your server runs on a different host/port.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "product1Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "product2Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Customers",
+      "description": "Customer management — create, list, and search. Run this folder first so that `customerId` is available for the Orders folder.",
+      "item": [
+        {
+          "name": "Create Customer (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Response body has id and name\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.be.a(\"number\");",
+                  "    pm.expect(body.name).to.eql(\"Alice Smith\");",
+                  "    pm.expect(body.orders).to.be.an(\"array\");",
+                  "    // Store the id for later requests",
+                  "    pm.collectionVariables.set(\"customerId\", body.id);",
+                  "    console.log(\"Saved customerId:\", body.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice Smith\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customer",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer"]
+            }
+          }
+        },
+        {
+          "name": "Create Customer — Blank Name (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Error body has status, error, message, timestamp\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.error).to.be.a(\"string\");",
+                  "    pm.expect(body.message).to.be.a(\"string\");",
+                  "    pm.expect(body.timestamp).to.be.a(\"string\");",
+                  "});",
+                  "",
+                  "pm.test(\"Error message mentions 'name'\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message.toLowerCase()).to.include(\"name\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customer",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer"]
+            }
+          }
+        },
+        {
+          "name": "Create Customer — Missing Name Field (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error body is present\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.message).to.be.a(\"string\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customer",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer"]
+            }
+          }
+        },
+        {
+          "name": "List All Customers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an array\", () => {",
+                  "    pm.expect(pm.response.json()).to.be.an(\"array\");",
+                  "});",
+                  "",
+                  "pm.test(\"Each customer has id, name, and orders array\", () => {",
+                  "    const customers = pm.response.json();",
+                  "    customers.forEach(c => {",
+                  "        pm.expect(c.id).to.be.a(\"number\");",
+                  "        pm.expect(c.name).to.be.a(\"string\");",
+                  "        pm.expect(c.orders).to.be.an(\"array\");",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/customer",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer"]
+            }
+          }
+        },
+        {
+          "name": "List Customers — Page 0, Size 2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an array with at most 2 items\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.be.an(\"array\");",
+                  "    pm.expect(body.length).to.be.at.most(2);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/customer?page=0&size=2",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "2" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Customers — Name Contains 'alice'",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an array\", () => {",
+                  "    pm.expect(pm.response.json()).to.be.an(\"array\");",
+                  "});",
+                  "",
+                  "pm.test(\"All results contain 'alice' in name (case-insensitive)\", () => {",
+                  "    const customers = pm.response.json();",
+                  "    customers.forEach(c => {",
+                  "        pm.expect(c.name.toLowerCase()).to.include(\"alice\");",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/customer/search?name=alice",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer", "search"],
+              "query": [
+                { "key": "name", "value": "alice" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Customers — Name Contains 'SMITH' (case-insensitive)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an array\", () => {",
+                  "    pm.expect(pm.response.json()).to.be.an(\"array\");",
+                  "});",
+                  "",
+                  "pm.test(\"All results contain 'smith' in name (case-insensitive)\", () => {",
+                  "    const customers = pm.response.json();",
+                  "    customers.forEach(c => {",
+                  "        pm.expect(c.name.toLowerCase()).to.include(\"smith\");",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/customer/search?name=SMITH",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer", "search"],
+              "query": [
+                { "key": "name", "value": "SMITH" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Customers — No Results",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an empty array\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.be.an(\"array\");",
+                  "    pm.expect(body.length).to.eql(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/customer/search?name=zzz_no_match_zzz",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer", "search"],
+              "query": [
+                { "key": "name", "value": "zzz_no_match_zzz" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Products",
+      "description": "Product catalogue — create and query. Run after the Customers folder. Creates two products and saves their IDs for the Orders folder.",
+      "item": [
+        {
+          "name": "Create Product 1 — Ergonomic Chair (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Response body has id, description, and orderIds array\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.be.a(\"number\");",
+                  "    pm.expect(body.description).to.eql(\"Ergonomic office chair\");",
+                  "    pm.expect(body.orderIds).to.be.an(\"array\");",
+                  "    pm.collectionVariables.set(\"product1Id\", body.id);",
+                  "    console.log(\"Saved product1Id:\", body.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Ergonomic office chair\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/product",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"]
+            }
+          }
+        },
+        {
+          "name": "Create Product 2 — Standing Desk (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response body has id and description\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.be.a(\"number\");",
+                  "    pm.expect(body.description).to.eql(\"Standing desk\");",
+                  "    pm.expect(body.orderIds).to.be.an(\"array\");",
+                  "    pm.collectionVariables.set(\"product2Id\", body.id);",
+                  "    console.log(\"Saved product2Id:\", body.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Standing desk\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/product",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"]
+            }
+          }
+        },
+        {
+          "name": "Create Product — Blank Description (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error body has status, error, message, timestamp\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.error).to.be.a(\"string\");",
+                  "    pm.expect(body.message).to.be.a(\"string\");",
+                  "    pm.expect(body.timestamp).to.be.a(\"string\");",
+                  "});",
+                  "",
+                  "pm.test(\"Error message mentions 'description'\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message.toLowerCase()).to.include(\"description\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/product",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"]
+            }
+          }
+        },
+        {
+          "name": "Create Product — Missing Description Field (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error body is present\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.message).to.be.a(\"string\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/product",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"]
+            }
+          }
+        },
+        {
+          "name": "List All Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an array\", () => {",
+                  "    pm.expect(pm.response.json()).to.be.an(\"array\");",
+                  "});",
+                  "",
+                  "pm.test(\"Each product has id, description, and orderIds array\", () => {",
+                  "    const products = pm.response.json();",
+                  "    products.forEach(p => {",
+                  "        pm.expect(p.id).to.be.a(\"number\");",
+                  "        pm.expect(p.description).to.be.a(\"string\");",
+                  "        pm.expect(p.orderIds).to.be.an(\"array\");",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/product",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"]
+            }
+          }
+        },
+        {
+          "name": "List Products — Page 0, Size 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an array with at most 1 item\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.be.an(\"array\");",
+                  "    pm.expect(body.length).to.be.at.most(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/product?page=0&size=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Product by ID — Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Product id matches the requested id\", () => {",
+                  "    const body = pm.response.json();",
+                  "    const expectedId = parseInt(pm.collectionVariables.get(\"product1Id\"));",
+                  "    pm.expect(body.id).to.eql(expectedId);",
+                  "    pm.expect(body.description).to.be.a(\"string\");",
+                  "    pm.expect(body.orderIds).to.be.an(\"array\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/product/{{product1Id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["product", "{{product1Id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Product by ID — Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 404 Not Found\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Error body has status 404\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(404);",
+                  "    pm.expect(body.error).to.be.a(\"string\");",
+                  "    pm.expect(body.message).to.be.a(\"string\");",
+                  "    pm.expect(body.timestamp).to.be.a(\"string\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/product/999999",
+              "host": ["{{baseUrl}}"],
+              "path": ["product", "999999"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Orders",
+      "description": "Order lifecycle — create and query. Depends on `customerId`, `product1Id`, `product2Id` being set by the previous folders.",
+      "item": [
+        {
+          "name": "Create Order — With Two Products (Happy Path)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Guard: warn if upstream IDs were never set",
+                  "const cid = pm.collectionVariables.get(\"customerId\");",
+                  "const p1  = pm.collectionVariables.get(\"product1Id\");",
+                  "const p2  = pm.collectionVariables.get(\"product2Id\");",
+                  "if (!cid || !p1 || !p2) {",
+                  "    console.warn(\"customerId / product1Id / product2Id not set — run folders 1 and 2 first!\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Response body has id, description, customer, products\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.be.a(\"number\");",
+                  "    pm.expect(body.description).to.eql(\"Office supplies for Q2\");",
+                  "    pm.expect(body.customer).to.be.an(\"object\");",
+                  "    pm.expect(body.customer.id).to.eql(parseInt(pm.collectionVariables.get(\"customerId\")));",
+                  "    pm.expect(body.products).to.be.an(\"array\");",
+                  "    pm.expect(body.products.length).to.eql(2);",
+                  "    pm.collectionVariables.set(\"orderId\", body.id);",
+                  "    console.log(\"Saved orderId:\", body.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": {{customerId}},\n  \"description\": \"Office supplies for Q2\",\n  \"productIds\": [{{product1Id}}, {{product2Id}}]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/order",
+              "host": ["{{baseUrl}}"],
+              "path": ["order"]
+            }
+          }
+        },
+        {
+          "name": "Create Order — No Products (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Products list is empty\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.products).to.be.an(\"array\");",
+                  "    pm.expect(body.products.length).to.eql(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": {{customerId}},\n  \"description\": \"Order with no products\",\n  \"productIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/order",
+              "host": ["{{baseUrl}}"],
+              "path": ["order"]
+            }
+          }
+        },
+        {
+          "name": "Create Order — Customer Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 404 Not Found\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Error body mentions customer\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(404);",
+                  "    pm.expect(body.message.toLowerCase()).to.include(\"customer\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": 999999,\n  \"description\": \"Order for non-existent customer\",\n  \"productIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/order",
+              "host": ["{{baseUrl}}"],
+              "path": ["order"]
+            }
+          }
+        },
+        {
+          "name": "Create Order — Blank Description (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error body has status 400\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.message).to.be.a(\"string\");",
+                  "});",
+                  "",
+                  "pm.test(\"Error message mentions 'description'\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message.toLowerCase()).to.include(\"description\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": {{customerId}},\n  \"description\": \"\",\n  \"productIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/order",
+              "host": ["{{baseUrl}}"],
+              "path": ["order"]
+            }
+          }
+        },
+        {
+          "name": "Create Order — Missing customerId (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Error body is present\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(400);",
+                  "    pm.expect(body.message).to.be.a(\"string\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Order missing customerId\",\n  \"productIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/order",
+              "host": ["{{baseUrl}}"],
+              "path": ["order"]
+            }
+          }
+        },
+        {
+          "name": "List All Orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an array\", () => {",
+                  "    pm.expect(pm.response.json()).to.be.an(\"array\");",
+                  "});",
+                  "",
+                  "pm.test(\"Each order has id, description, customer, and products\", () => {",
+                  "    const orders = pm.response.json();",
+                  "    orders.forEach(o => {",
+                  "        pm.expect(o.id).to.be.a(\"number\");",
+                  "        pm.expect(o.description).to.be.a(\"string\");",
+                  "        pm.expect(o.customer).to.be.an(\"object\");",
+                  "        pm.expect(o.customer.id).to.be.a(\"number\");",
+                  "        pm.expect(o.customer.name).to.be.a(\"string\");",
+                  "        pm.expect(o.products).to.be.an(\"array\");",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/order",
+              "host": ["{{baseUrl}}"],
+              "path": ["order"]
+            }
+          }
+        },
+        {
+          "name": "List Orders — Page 0, Size 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an array with at most 1 item\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.be.an(\"array\");",
+                  "    pm.expect(body.length).to.be.at.most(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/order?page=0&size=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["order"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Order by ID — Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Order id matches the requested id\", () => {",
+                  "    const body = pm.response.json();",
+                  "    const expectedId = parseInt(pm.collectionVariables.get(\"orderId\"));",
+                  "    pm.expect(body.id).to.eql(expectedId);",
+                  "    pm.expect(body.description).to.be.a(\"string\");",
+                  "    pm.expect(body.customer).to.be.an(\"object\");",
+                  "    pm.expect(body.products).to.be.an(\"array\");",
+                  "});",
+                  "",
+                  "pm.test(\"Order includes both products\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.products.length).to.eql(2);",
+                  "    body.products.forEach(p => {",
+                  "        pm.expect(p.id).to.be.a(\"number\");",
+                  "        pm.expect(p.description).to.be.a(\"string\");",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/order/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["order", "{{orderId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Order by ID — Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 404 Not Found\", () => {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has X-Trace-Id header\", () => {",
+                  "    pm.response.to.have.header(\"X-Trace-Id\");",
+                  "});",
+                  "",
+                  "pm.test(\"Error body has status 404\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(404);",
+                  "    pm.expect(body.error).to.be.a(\"string\");",
+                  "    pm.expect(body.message).to.be.a(\"string\");",
+                  "    pm.expect(body.timestamp).to.be.a(\"string\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/order/999999",
+              "host": ["{{baseUrl}}"],
+              "path": ["order", "999999"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Tracing",
+      "description": "Verifies that X-Trace-Id propagation works correctly — the server echoes back a client-supplied ID rather than generating a new one.",
+      "item": [
+        {
+          "name": "Propagate X-Trace-Id From Client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Server echoes the client-supplied X-Trace-Id\", () => {",
+                  "    const sent = pm.request.headers.get(\"X-Trace-Id\");",
+                  "    const received = pm.response.headers.get(\"X-Trace-Id\");",
+                  "    pm.expect(received).to.eql(sent);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Trace-Id", "value": "test-trace-abc123" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customer",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer"]
+            }
+          }
+        },
+        {
+          "name": "Server Generates X-Trace-Id When None Provided",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"X-Trace-Id header is present and non-empty\", () => {",
+                  "    const traceId = pm.response.headers.get(\"X-Trace-Id\");",
+                  "    pm.expect(traceId).to.be.a(\"string\");",
+                  "    pm.expect(traceId.length).to.be.at.least(16);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/customer",
+              "host": ["{{baseUrl}}"],
+              "path": ["customer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Actuator",
+      "description": "Verifies that Spring Boot Actuator endpoints are reachable and healthy.",
+      "item": [
+        {
+          "name": "Health — Overall",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Overall status is UP\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(\"UP\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          }
+        },
+        {
+          "name": "Health — Liveness Probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Liveness status is UP\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(\"UP\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health/liveness",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health", "liveness"]
+            }
+          }
+        },
+        {
+          "name": "Health — Readiness Probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Readiness status is UP\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(\"UP\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health/readiness",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health", "readiness"]
+            }
+          }
+        },
+        {
+          "name": "Info",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Info body is present\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.be.an(\"object\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/actuator/info",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "info"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+

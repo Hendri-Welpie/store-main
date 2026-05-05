@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 4-fix-sequences
+      author: developer@example.com
+      runAlways: true
+      changes:
+        - sqlFile:
+            path: db/changelog/fix-sequences.sql
+

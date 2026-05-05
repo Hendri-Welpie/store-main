@@ -1,0 +1,637 @@
+openapi: 3.0.3
+info:
+  title: Store API
+  version: 1.0.0
+  description: |
+    REST API for managing customers, orders, and products.
+
+    ## Pagination
+    All collection endpoints accept `page` (0-based index) and `size` query parameters.
+
+    ## Error responses
+    Every 4xx / 5xx response returns an `ErrorResponse` object with a consistent structure.
+
+    ## Tracing
+    Every response includes an `X-Trace-Id` header that can be used to correlate
+    client-side logs with server-side logs.
+  contact:
+    name: SecuritEase Dev
+    url: 'https://www.securitease.com'
+    email: internal@securitease.com
+  termsOfService: 'https://www.securitease.com'
+  license:
+    name: Apache 2.0
+    url: 'https://www.apache.org/licenses/LICENSE-2.0.html'
+
+servers:
+  - url: 'http://localhost:8080'
+    description: Local development (bare JVM)
+  - url: 'http://localhost:8080'
+    description: Local development (docker compose)
+
+tags:
+  - name: Orders
+    description: Order lifecycle — create and query orders
+  - name: Customers
+    description: Customer management — create and search customers
+  - name: Products
+    description: Product catalogue — create and query products
+
+# =============================================================================
+# Paths
+# =============================================================================
+paths:
+
+  # ---------------------------------------------------------------------------
+  # /order
+  # ---------------------------------------------------------------------------
+  /order:
+    get:
+      summary: List all orders
+      operationId: getAllOrders
+      tags: [Orders]
+      description: >
+        Returns a paginated list of orders. Each order includes a truncated
+        customer object and all associated products.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Paginated list of orders
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/XTraceId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderDTO'
+              example:
+                - id: 42
+                  description: "Office supplies for Q2"
+                  customer:
+                    id: 1
+                    name: "Alice Smith"
+                  products:
+                    - id: 10
+                      description: "Ergonomic office chair"
+
+    post:
+      summary: Create an order
+      operationId: createOrder
+      tags: [Orders]
+      description: >
+        Creates a new order for an existing customer, optionally associating
+        one or more products. All listed product IDs must already exist.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreateRequest'
+            example:
+              customerId: 1
+              description: "Office supplies for Q2"
+              productIds: [10, 11]
+      responses:
+        '201':
+          description: Order created successfully
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/XTraceId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: The referenced customer was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: 404
+                error: "Not Found"
+                message: "Customer not found: 99"
+                timestamp: "2026-05-05T08:00:00Z"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ---------------------------------------------------------------------------
+  # /order/{id}
+  # ---------------------------------------------------------------------------
+  /order/{id}:
+    get:
+      summary: Get an order by ID
+      operationId: getOrderById
+      tags: [Orders]
+      description: >
+        Returns a single order by its identifier, including customer
+        and product details.
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+      responses:
+        '200':
+          description: Order found
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/XTraceId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ---------------------------------------------------------------------------
+  # /customer
+  # ---------------------------------------------------------------------------
+  /customer:
+    get:
+      summary: List all customers
+      operationId: getAllCustomers
+      tags: [Customers]
+      description: Returns a paginated list of customers with a summary of their orders.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Paginated list of customers
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/XTraceId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerDTO'
+              example:
+                - id: 1
+                  name: "Alice Smith"
+                  orders:
+                    - id: 42
+                      description: "Office supplies for Q2"
+
+    post:
+      summary: Create a customer
+      operationId: createCustomer
+      tags: [Customers]
+      description: Creates a new customer record.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerCreateRequest'
+            example:
+              name: "Alice Smith"
+      responses:
+        '201':
+          description: Customer created successfully
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/XTraceId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ---------------------------------------------------------------------------
+  # /customer/search
+  # ---------------------------------------------------------------------------
+  /customer/search:
+    get:
+      summary: Search customers by name
+      operationId: searchCustomersByName
+      tags: [Customers]
+      description: >
+        Returns a paginated list of customers whose name contains the given
+        substring. The match is case-insensitive and anchored to word boundaries.
+      parameters:
+        - name: name
+          in: query
+          required: true
+          description: Substring to match against customer names (case-insensitive).
+          schema:
+            type: string
+            minLength: 1
+          example: alice
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Customers whose names match the search term
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/XTraceId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomerDTO'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ---------------------------------------------------------------------------
+  # /product
+  # ---------------------------------------------------------------------------
+  /product:
+    get:
+      summary: List all products
+      operationId: getAllProducts
+      tags: [Products]
+      description: >
+        Returns a paginated list of products. Each product includes the IDs of
+        every order that contains it.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Paginated list of products
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/XTraceId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductDTO'
+              example:
+                - id: 10
+                  description: "Ergonomic office chair"
+                  orderIds: [42, 43]
+
+    post:
+      summary: Create a product
+      operationId: createProduct
+      tags: [Products]
+      description: >
+        Creates a new product in the catalogue. To associate the product with
+        an order, include its ID in the `productIds` field of `POST /order`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreateRequest'
+            example:
+              description: "Ergonomic office chair"
+      responses:
+        '201':
+          description: Product created successfully
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/XTraceId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ---------------------------------------------------------------------------
+  # /product/{id}
+  # ---------------------------------------------------------------------------
+  /product/{id}:
+    get:
+      summary: Get a product by ID
+      operationId: getProductById
+      tags: [Products]
+      description: Returns a single product and the IDs of all orders that contain it.
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+      responses:
+        '200':
+          description: Product found
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/XTraceId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDTO'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+# =============================================================================
+# Components
+# =============================================================================
+components:
+
+  # ---------------------------------------------------------------------------
+  # Reusable parameters
+  # ---------------------------------------------------------------------------
+  parameters:
+
+    IdPathParam:
+      name: id
+      in: path
+      required: true
+      description: Unique numeric identifier of the resource.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 42
+
+    PageParam:
+      name: page
+      in: query
+      required: false
+      description: Zero-based page index.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      example: 0
+
+    SizeParam:
+      name: size
+      in: query
+      required: false
+      description: Number of items per page (max 100).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+      example: 10
+
+  # ---------------------------------------------------------------------------
+  # Reusable headers
+  # ---------------------------------------------------------------------------
+  headers:
+    XTraceId:
+      description: >
+        Unique 16-character trace identifier attached to every request by the
+        `RequestTracingFilter`. Present in all server-side log lines for this
+        request. Pass it in the request as `X-Trace-Id` to propagate an
+        upstream trace ID.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 36
+      example: a3f9c12d8b4e6701
+
+  # ---------------------------------------------------------------------------
+  # Reusable responses
+  # ---------------------------------------------------------------------------
+  responses:
+
+    BadRequest:
+      description: Request body failed validation (e.g. missing required field, blank string).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: 400
+            error: "Bad Request"
+            message: "name: must not be blank"
+            timestamp: "2026-05-05T08:00:00Z"
+
+    NotFound:
+      description: The requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: 404
+            error: "Not Found"
+            message: "Not Found"
+            timestamp: "2026-05-05T08:00:00Z"
+
+    InternalServerError:
+      description: An unexpected server-side error occurred.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: 500
+            error: "Internal Server Error"
+            message: "An unexpected error occurred. Please try again later."
+            timestamp: "2026-05-05T08:00:00Z"
+
+  # ---------------------------------------------------------------------------
+  # Schemas
+  # ---------------------------------------------------------------------------
+  schemas:
+
+    # ------- Response DTOs ---------------------------------------------------
+
+    OrderDTO:
+      title: OrderDTO
+      type: object
+      description: A single order with embedded customer and product summaries.
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+          description: Order identifier.
+          example: 42
+        description:
+          type: string
+          description: Human-readable description of the order.
+          example: "Office supplies for Q2"
+        customer:
+          $ref: '#/components/schemas/OrderCustomerDTO'
+        products:
+          type: array
+          description: Products associated with this order.
+          items:
+            $ref: '#/components/schemas/OrderProductDTO'
+
+    OrderCustomerDTO:
+      title: OrderCustomerDTO
+      type: object
+      description: >
+        Truncated customer representation embedded inside an `OrderDTO`.
+        Avoids circular serialisation by omitting the customer's order list.
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: "Alice Smith"
+
+    OrderProductDTO:
+      title: OrderProductDTO
+      type: object
+      description: >
+        Truncated product representation embedded inside an `OrderDTO`.
+        Avoids circular serialisation by omitting the product's order list.
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 10
+        description:
+          type: string
+          example: "Ergonomic office chair"
+
+    CustomerDTO:
+      title: CustomerDTO
+      type: object
+      description: A customer with a summary of their orders.
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+          description: Customer identifier.
+          example: 1
+        name:
+          type: string
+          description: Full name of the customer.
+          example: "Alice Smith"
+        orders:
+          type: array
+          description: Orders placed by this customer.
+          items:
+            $ref: '#/components/schemas/CustomerOrderDTO'
+
+    CustomerOrderDTO:
+      title: CustomerOrderDTO
+      type: object
+      description: >
+        Truncated order representation embedded inside a `CustomerDTO`.
+        Avoids circular serialisation by omitting the order's customer reference.
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 42
+        description:
+          type: string
+          example: "Office supplies for Q2"
+
+    ProductDTO:
+      title: ProductDTO
+      type: object
+      description: A product and the IDs of all orders that contain it.
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+          description: Product identifier.
+          example: 10
+        description:
+          type: string
+          description: Human-readable description of the product.
+          example: "Ergonomic office chair"
+        orderIds:
+          type: array
+          description: IDs of every order that contains this product.
+          items:
+            type: integer
+            format: int64
+          example: [42, 43]
+
+    # ------- Request bodies --------------------------------------------------
+
+    OrderCreateRequest:
+      title: OrderCreateRequest
+      type: object
+      description: Payload for creating a new order.
+      required:
+        - customerId
+        - description
+      properties:
+        customerId:
+          type: integer
+          format: int64
+          description: ID of an existing customer who is placing the order.
+          example: 1
+        description:
+          type: string
+          minLength: 1
+          description: Human-readable description of the order.
+          example: "Office supplies for Q2"
+        productIds:
+          type: array
+          description: >
+            IDs of existing products to include in the order.
+            Defaults to an empty list if omitted.
+          items:
+            type: integer
+            format: int64
+          example: [10, 11]
+
+    CustomerCreateRequest:
+      title: CustomerCreateRequest
+      type: object
+      description: Payload for creating a new customer.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Full name of the customer.
+          example: "Alice Smith"
+
+    ProductCreateRequest:
+      title: ProductCreateRequest
+      type: object
+      description: Payload for creating a new product.
+      required:
+        - description
+      properties:
+        description:
+          type: string
+          minLength: 1
+          description: Human-readable description of the product.
+          example: "Ergonomic office chair"
+
+    # ------- Error envelope --------------------------------------------------
+
+    ErrorResponse:
+      title: ErrorResponse
+      type: object
+      description: >
+        Uniform error body returned by the `GlobalExceptionHandler` for all
+        4xx and 5xx responses. No internal stack traces or JPA details are
+        ever included.
+      properties:
+        status:
+          type: integer
+          description: HTTP status code.
+          example: 400
+        error:
+          type: string
+          description: HTTP status reason phrase.
+          example: "Bad Request"
+        message:
+          type: string
+          description: Human-readable explanation of what went wrong.
+          example: "name: must not be blank"
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO-8601 timestamp of when the error occurred (UTC).
+          example: "2026-05-05T08:00:00Z"

@@ -1,0 +1,93 @@
+spring:
+  application:
+    name: store
+
+  datasource:
+    # Credentials are read from environment variables with safe local defaults.
+    # In production set DB_URL, DB_USERNAME, DB_PASSWORD via your secret manager.
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/store}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:admin}
+    hikari:
+      pool-name: StoreHikariPool
+      # Size the pool to match expected concurrent transactions.
+      # Formula: (core_count * 2) + effective_spindle_count — start at 10, tune from metrics.
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 5
+      # -1 means Hikari will keep retrying to obtain connections on startup rather than
+      # throwing an exception immediately. This tolerates transient network unavailability
+      # at boot time (e.g. Docker DNS propagation delay) and lets depends_on + restart
+      # policies handle eventual consistency. Set to 0 or a positive ms value in
+      # environments where you want a hard fail-fast instead.
+      initialization-fail-timeout: -1
+      connection-timeout: 30000   # 30 s — fail fast if pool is exhausted at runtime
+      idle-timeout: 600000        # 10 min — return idle connections to the DB
+      max-lifetime: 1800000       # 30 min — rotate to avoid stale TCP sessions
+      keepalive-time: 60000       # 1 min — prevent firewall from dropping idle connections
+
+  jpa:
+    # CRITICAL: open-in-view=true (the default) keeps a DB connection open for the
+    # entire HTTP request. Under any load this exhausts the connection pool.
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        default_batch_fetch_size: 25
+
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+  # Release in-flight requests before shutting the JVM down.
+  # Works with server.shutdown=graceful to give requests up to 30 s to complete.
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # health   — liveness/readiness probes, load-balancer checks
+        # info     — build version, git commit (populated by springBoot { buildInfo() })
+        # metrics  — Micrometer metrics for Prometheus / Grafana
+        # loggers  — change log levels at runtime without restart
+        include: health, info, metrics, loggers
+  endpoint:
+    health:
+      # show-details is overridden to 'always' in docker-compose via environment variable
+      # so operators can see the DB/disk sub-component breakdown locally.
+      show-details: when-authorized
+      show-components: always   # always show which components exist, even if details are hidden
+      probes:
+        # /actuator/health/liveness  — is the JVM alive?
+        # /actuator/health/readiness — is the app ready to serve traffic?
+        # Used by Kubernetes and the docker-compose depends_on health check.
+        enabled: true
+    loggers:
+      enabled: true
+  info:
+    build:
+      enabled: true   # populated by springBoot { buildInfo() } in build.gradle
+    env:
+      enabled: true   # expose spring.application.name etc. under /actuator/info
+    java:
+      enabled: true   # JVM vendor and version — useful for audit
+
+info:
+  application:
+    description: Store API — manages customers, orders, and products
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-no-trace}] %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.example.store: DEBUG
+    com.example.store.service: TRACE
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE

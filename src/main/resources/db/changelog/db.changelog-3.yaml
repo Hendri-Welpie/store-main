@@ -1,0 +1,8 @@
+databaseChangeLog:
+  - changeSet:
+      id: 3-products
+      author: developer@example.com
+      changes:
+        - sqlFile:
+            path: db/changelog/schema-products.sql
+

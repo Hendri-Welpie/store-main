@@ -1,0 +1,114 @@
+# =============================================================================
+# Store Application — Docker Compose
+#
+# Services:
+#   postgres  — PostgreSQL 16.2 database (the only third-party dependency)
+#   store     — Spring Boot application built from the local Dockerfile
+#
+# Usage:
+#   docker compose up --build        # first run / after code changes
+#   docker compose up -d             # start in background
+#   docker compose down -v           # stop and remove volumes (resets DB)
+#   docker compose logs -f store     # tail application logs
+#
+# Override any value with a .env file in this directory (see .env.example).
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16.2
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16.2
+    container_name: store-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER:     ${DB_USERNAME:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
+      POSTGRES_DB:       ${DB_NAME:-store}
+
+    ports:
+      # Exposed on the non-standard host port 5433 so it doesn't clash with
+      # a locally-installed PostgreSQL instance on the default 5432.
+      - "${DB_HOST_PORT:-5433}:5432"
+
+    volumes:
+      # Named volume — data survives container restarts.
+      # Run `docker compose down -v` to wipe for a clean slate.
+      - postgres-data:/var/lib/postgresql/data
+
+    # wal_level=logical is required if you want to use logical replication,
+    # Debezium CDC, or pgoutput-based change capture later.
+    command: postgres -c wal_level=logical
+
+    healthcheck:
+      # pg_isready exits 0 only when the server is accepting connections.
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-admin} -d ${DB_NAME:-store}"]
+      interval:     10s
+      timeout:       5s
+      retries:       5
+      start_period: 30s   # give the cluster time to initialise on first boot
+
+
+  # ---------------------------------------------------------------------------
+  # Store Spring Boot Application
+  # ---------------------------------------------------------------------------
+  store:
+    build:
+      context:    .
+      dockerfile: Dockerfile
+    image: store-app:local
+    container_name: store-app
+    restart: unless-stopped
+
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+    environment:
+      # --- Database -----------------------------------------------------------
+      # Points at the postgres service using its Docker-internal hostname.
+      # Note: internal port is always 5432 regardless of the host mapping above.
+      DB_URL:       jdbc:postgresql://postgres:5432/${DB_NAME:-store}
+      DB_USERNAME:  ${DB_USERNAME:-admin}
+      DB_PASSWORD:  ${DB_PASSWORD:-admin}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+
+      # --- Actuator overrides -------------------------------------------------
+      # Show full health sub-component details locally so operators can quickly
+      # diagnose DB connectivity issues without needing authorisation.
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: always
+      # Expose all useful endpoints in the compose environment. In production,
+      # restrict this to "health,info" via your secret/config manager.
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,loggers
+
+      # --- Logging ------------------------------------------------------------
+      # Override the default 'when-authorized' Hibernate SQL logging for local
+      # development. Remove or set to INFO to silence verbose query output.
+      LOGGING_LEVEL_ORG_HIBERNATE_SQL: ${HIBERNATE_SQL_LOG_LEVEL:-DEBUG}
+
+    depends_on:
+      postgres:
+        # The app will not start until PostgreSQL passes its healthcheck,
+        # preventing "Connection refused" errors during Liquibase migration.
+        condition: service_healthy
+
+    healthcheck:
+      # Use the readiness probe — it returns UP only after the Spring context
+      # is fully started AND dependencies (DB, migrations) are healthy.
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health/readiness || exit 1"]
+      interval:      30s
+      timeout:       10s
+      retries:        3
+      # Allow extra time for JVM warm-up + Liquibase schema migration on startup.
+      start_period:  90s
+
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres-data:
+    driver: local
+
