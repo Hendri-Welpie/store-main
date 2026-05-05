@@ -129,7 +129,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY_GHCR }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GIT_GHCR_TOKEN }}
 
       - name: Extract project version
         id: vars
